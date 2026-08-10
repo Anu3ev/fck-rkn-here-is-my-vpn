@@ -1,0 +1,10 @@
+.env
+.env.local
+.env.*.local
+.runtime/
+backups/
+*.tar.gz
+*.tar.gz.sha256
+*.pem
+*.key
+*.dpapi

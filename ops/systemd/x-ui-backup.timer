@@ -1,0 +1,10 @@
+[Unit]
+Description=Create a daily x-ui backup
+
+[Timer]
+OnCalendar=*-*-* 03:35:00
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

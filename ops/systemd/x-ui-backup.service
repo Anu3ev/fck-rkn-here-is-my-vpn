@@ -1,0 +1,9 @@
+[Unit]
+Description=Create an x-ui backup
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/x-ui-backup
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

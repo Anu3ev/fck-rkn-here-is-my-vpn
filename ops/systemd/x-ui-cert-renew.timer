@@ -1,0 +1,10 @@
+[Unit]
+Description=Check the x-ui certificate four times per day
+
+[Timer]
+OnCalendar=*-*-* 02,08,14,20:18:00
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
