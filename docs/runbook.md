@@ -19,16 +19,17 @@ sudo systemctl list-timers 'x-ui-*'
 sudo journalctl -u x-ui -u x-ui-health --since '-24 hours' --no-pager
 ```
 
-`x-ui` owns the panel and Xray process. `x-ui-health` listens only on `127.0.0.1:10809`; the built-in monitor uses it to make a real request through the public VLESS REALITY path.
+`x-ui` owns the panel and Xray process. `x-ui-health` listens only on `127.0.0.1:10809`; the built-in monitor uses it to make a real request through the public Hysteria2 path.
 
 ## Add or disable a person
 
-In the 3x-ui inbound:
+In the `hysteria2-primary` inbound:
 
-1. Add a client with a unique name, UUID, and subscription ID.
+1. Add a client with a unique name, generated authentication value, and subscription ID.
 2. Apply a traffic or expiry limit only when needed.
-3. Send only that person's subscription URL through a private channel.
-4. To revoke access, disable or delete that client without changing other users.
+3. Test the normal `SUB` URL in OneXray.
+4. Send only that person's subscription URL through a private channel.
+5. To revoke access, disable or delete that client without changing other users.
 
 Never reuse the technical `health-monitor` client for a person.
 
@@ -74,10 +75,12 @@ If the certificate changes location, update the panel and subscription certifica
 ## When clients cannot connect
 
 1. Run `x-ui-diagnose`.
-2. Check whether the configured Xray port is listening and allowed by UFW.
-3. Test the same subscription in another supported client.
-4. Test both Wi-Fi and mobile data.
-5. Compare the failure time with Xray and health-client logs.
-6. Confirm the client's subscription has refreshed after any path or certificate change.
+2. Confirm that the configured tunnel port is listening on UDP and is allowed by both UFW and the provider firewall.
+3. Confirm the client selected Hysteria2 with OneXray Routing set to `Global`.
+4. Refresh the subscription and test both Wi-Fi and mobile data.
+5. Compare the exact failure time with Xray, health-client, and OneXray Error Log entries.
+6. Confirm that TLS server name, certificate, client authentication, and Salamander password still match.
 
 If one network fails while another works, the VPS may be healthy and the network path may be filtered.
+
+Use [OneXray troubleshooting](onexray.md) for the end-user steps. Do not interpret a green Online badge as proof that DNS and web traffic work; the egress-IP request is the complete check.

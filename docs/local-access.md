@@ -13,8 +13,8 @@ A password manager is the preferred place for the panel credentials and user sub
 Required files:
 
 ```text
-x-ui-3x-ui.dpapi
-x-ui-subscriptions.dpapi
+vpn-3x-ui.dpapi
+vpn-subscriptions.dpapi
 ```
 
 The first encrypted value must decrypt to this key/value format:
@@ -43,7 +43,7 @@ install -d -m 700 ~/.config/vpn
 umask 077
 ```
 
-Create `x-ui-3x-ui.env` using the same three key/value lines shown above. Create `x-ui-subscriptions.json` as a JSON object whose values are subscription URLs. Both files must have mode `600` or `400`.
+Create `vpn-3x-ui.env` using the same three key/value lines shown above. Create `vpn-subscriptions.json` as a JSON object whose values are subscription URLs. Both files must have mode `600` or `400`.
 
 Display them only when needed:
 

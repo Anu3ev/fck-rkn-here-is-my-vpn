@@ -24,10 +24,13 @@ This file is a reusable checklist, not proof that a new deployment has passed. S
 
 ## VPN path
 
-- One VLESS REALITY inbound listens on the configured Xray port.
-- Every client uses REALITY, TCP/Raw, and XTLS Vision as intended.
+- One Hysteria2 inbound listens on the configured UDP tunnel port.
+- The VPS provider firewall and UFW both allow that UDP port.
+- TLS uses the configured domain, a valid certificate, and `h3` ALPN.
+- FinalMask uses UDP Salamander with the same strong password on server and clients.
+- Every person has a unique authentication value and subscription ID.
 - The technical health client is separate from all human users.
-- `x-ui-diagnose` reports a successful REALITY HTTPS request.
+- `x-ui-diagnose` reports a successful Hysteria2 HTTPS request and the expected egress IP.
 - A real phone or computer imports its subscription, connects, resolves DNS, and shows the VPS egress IP.
 - Per-client online state and traffic counters update in 3x-ui.
 
@@ -52,6 +55,7 @@ sudo /usr/local/sbin/x-ui-backup
 ## Honest limitations
 
 - A successful test from one country or network does not guarantee reachability from another.
-- An external TCP monitor proves that a port is reachable, not that a full REALITY session works.
+- A normal TCP monitor cannot validate a Hysteria2 UDP listener.
+- An open UDP port does not prove that TLS, authentication, masking, DNS, and proxying all work.
 - A restore dry run validates the archive and SQLite database but does not replace a periodic restore test on a clean VPS.
 - No single transport or IP address is guaranteed to remain reachable in a filtered network.

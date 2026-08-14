@@ -4,7 +4,7 @@ set -euo pipefail
 readonly RUNTIME_CONFIG="/etc/default/vpn"
 # shellcheck disable=SC1090,SC1091 # Created and protected by deploy.sh.
 source "${RUNTIME_CONFIG}"
-readonly VPN_EXPECTED_EGRESS_IP VPN_PANEL_PORT VPN_SUBSCRIPTION_PORT VPN_XRAY_PORT
+readonly VPN_EXPECTED_EGRESS_IP VPN_PANEL_PORT VPN_SUBSCRIPTION_PORT VPN_TUNNEL_PORT
 readonly VPN_CERTIFICATE_FILE
 
 # Prints a check name and fails the diagnostic run when its command fails.
@@ -23,7 +23,7 @@ check() {
   return 1
 }
 
-# Confirms that an HTTPS request exits through the configured REALITY tunnel.
+# Confirms that an HTTPS request exits through the configured Hysteria2 tunnel.
 check_tunnel() {
   local trace
   local exit_ip
@@ -36,8 +36,27 @@ check_tunnel() {
   [[ "${exit_ip}" == "${VPN_EXPECTED_EGRESS_IP}" ]]
 }
 
+# Confirms that a configured TCP or UDP listener exists on the host.
+check_listener() {
+  local transport="$1"
+  local port="$2"
+  [[ "${transport}" == "tcp" || "${transport}" == "udp" ]]
+  [[ "${port}" =~ ^[0-9]+$ ]]
+
+  if [[ "${transport}" == "udp" ]]; then
+    ss -H -lnu "sport = :${port}" | grep -q .
+    return
+  fi
+
+  ss -H -lnt "sport = :${port}" | grep -q .
+}
+
 [[ "${EUID}" -eq 0 ]]
 [[ -s "${RUNTIME_CONFIG}" ]]
+[[ "${VPN_TUNNEL_PORT}" =~ ^[0-9]+$ ]]
+[[ "${VPN_SUBSCRIPTION_PORT}" =~ ^[0-9]+$ ]]
+[[ "${VPN_PANEL_PORT}" =~ ^[0-9]+$ ]]
+[[ "${VPN_EXPECTED_EGRESS_IP}" =~ ^[0-9A-Fa-f:.]+$ ]]
 
 printf '== System ==\n'
 printf 'Uptime: %s\n' "$(uptime -p)"
@@ -54,13 +73,12 @@ check 'automatic security updates' systemctl is-active --quiet unattended-upgrad
 check 'Fail2Ban' systemctl is-active --quiet fail2ban
 check 'direct HTTPS' curl --silent --show-error --fail --max-time 20 \
   --output /dev/null https://www.cloudflare.com/
-check 'REALITY HTTPS request' check_tunnel
-check "Xray port ${VPN_XRAY_PORT}" bash -c \
-  "ss -H -lnt sport = :${VPN_XRAY_PORT} | grep -q ."
-check "subscription port ${VPN_SUBSCRIPTION_PORT}" bash -c \
-  "ss -H -lnt sport = :${VPN_SUBSCRIPTION_PORT} | grep -q ."
-check "panel port ${VPN_PANEL_PORT}" bash -c \
-  "ss -H -lnt sport = :${VPN_PANEL_PORT} | grep -q ."
+check 'Hysteria2 HTTPS request' check_tunnel
+check "Hysteria2 UDP port ${VPN_TUNNEL_PORT}" \
+  check_listener udp "${VPN_TUNNEL_PORT}"
+check "subscription TCP port ${VPN_SUBSCRIPTION_PORT}" \
+  check_listener tcp "${VPN_SUBSCRIPTION_PORT}"
+check "panel TCP port ${VPN_PANEL_PORT}" check_listener tcp "${VPN_PANEL_PORT}"
 check 'backup timer' systemctl is-active --quiet x-ui-backup.timer
 
 if [[ -n "${VPN_CERTIFICATE_FILE}" ]]; then

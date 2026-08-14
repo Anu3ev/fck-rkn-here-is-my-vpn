@@ -15,7 +15,8 @@ readonly VPN_SERVER_ADDRESS="${VPN_SERVER_ADDRESS:-}"
 readonly VPN_EXPECTED_EGRESS_IP="${VPN_EXPECTED_EGRESS_IP:-}"
 readonly VPN_PANEL_PORT="${VPN_PANEL_PORT:-}"
 readonly VPN_SUBSCRIPTION_PORT="${VPN_SUBSCRIPTION_PORT:-2096}"
-readonly VPN_XRAY_PORT="${VPN_XRAY_PORT:-443}"
+readonly VPN_TUNNEL_PORT="${VPN_TUNNEL_PORT:-443}"
+readonly VPN_TLS_SERVER_NAME="${VPN_TLS_SERVER_NAME:-}"
 readonly VPN_CERTIFICATE_FILE="${VPN_CERTIFICATE_FILE:-}"
 readonly PANEL_ALLOWED_CIDR="${PANEL_ALLOWED_CIDR:-}"
 readonly ADMIN_PUBLIC_KEY_FILE="${ADMIN_PUBLIC_KEY_FILE:-}"
@@ -54,13 +55,13 @@ validate_host() {
   [[ -s "${REPO_ROOT}/ops/diagnose.sh" ]]
 }
 
-# Validates one public TCP port used by the deployment.
+# Validates one public TCP or UDP port used by the deployment.
 validate_port() {
   local name="$1"
   local value="$2"
   [[ -n "${name}" ]]
   [[ "${value}" =~ ^[0-9]+$ ]]
-  [[ "${value}" -ge 1024 && "${value}" -le 65535 ]]
+  [[ "${value}" -ge 1 && "${value}" -le 65535 ]]
 }
 
 # Validates the common non-secret deployment values.
@@ -69,11 +70,17 @@ validate_configuration() {
   [[ "${VPN_ADMIN_USER}" =~ ^[a-z_][a-z0-9_-]{0,30}$ ]]
   [[ "${VPN_SERVER_ADDRESS}" =~ ^[A-Za-z0-9._:-]+$ ]]
   [[ "${VPN_EXPECTED_EGRESS_IP}" =~ ^[0-9A-Fa-f:.]+$ ]]
+  [[ "${VPN_TLS_SERVER_NAME}" =~ ^[A-Za-z0-9.-]+$ ]]
   [[ -z "${VPN_CERTIFICATE_FILE}" || "${VPN_CERTIFICATE_FILE}" =~ ^/[A-Za-z0-9._/-]+$ ]]
   [[ -z "${PANEL_ALLOWED_CIDR}" || "${PANEL_ALLOWED_CIDR}" =~ ^[0-9A-Fa-f:./]+$ ]]
   validate_port "panel" "${VPN_PANEL_PORT}"
   validate_port "subscription" "${VPN_SUBSCRIPTION_PORT}"
-  validate_port "Xray" "${VPN_XRAY_PORT}"
+  validate_port "tunnel" "${VPN_TUNNEL_PORT}"
+  [[ "${VPN_PANEL_PORT}" -ge 1024 ]]
+  [[ "${VPN_SUBSCRIPTION_PORT}" -ge 1024 ]]
+  [[ "${VPN_PANEL_PORT}" != "${VPN_SUBSCRIPTION_PORT}" ]]
+  [[ "${VPN_PANEL_PORT}" != "${VPN_TUNNEL_PORT}" ]]
+  [[ "${VPN_SUBSCRIPTION_PORT}" != "${VPN_TUNNEL_PORT}" ]]
 }
 
 # Validates the public key required to create the administrative account.
@@ -143,7 +150,8 @@ write_runtime_configuration() {
     printf 'VPN_EXPECTED_EGRESS_IP=%q\n' "${VPN_EXPECTED_EGRESS_IP}"
     printf 'VPN_PANEL_PORT=%q\n' "${VPN_PANEL_PORT}"
     printf 'VPN_SUBSCRIPTION_PORT=%q\n' "${VPN_SUBSCRIPTION_PORT}"
-    printf 'VPN_XRAY_PORT=%q\n' "${VPN_XRAY_PORT}"
+    printf 'VPN_TUNNEL_PORT=%q\n' "${VPN_TUNNEL_PORT}"
+    printf 'VPN_TLS_SERVER_NAME=%q\n' "${VPN_TLS_SERVER_NAME}"
     printf 'VPN_CERTIFICATE_FILE=%q\n' "${VPN_CERTIFICATE_FILE}"
     printf 'PANEL_ALLOWED_CIDR=%q\n' "${PANEL_ALLOWED_CIDR}"
   } > "${temporary_path}"
@@ -160,7 +168,7 @@ configure_firewall() {
   ufw default allow outgoing
   ufw limit 22/tcp
   ufw allow 80/tcp
-  ufw allow "${VPN_XRAY_PORT}/tcp"
+  ufw allow "${VPN_TUNNEL_PORT}/udp"
   ufw allow "${VPN_SUBSCRIPTION_PORT}/tcp"
 
   if [[ -n "${PANEL_ALLOWED_CIDR}" ]]; then
@@ -171,7 +179,7 @@ configure_firewall() {
 
   ufw --force enable
   [[ "$(ufw status | head -n 1)" == "Status: active" ]]
-  ufw status | grep -q "${VPN_XRAY_PORT}/tcp"
+  ufw status | grep -q "${VPN_TUNNEL_PORT}/udp"
 }
 
 # Installs host policies and enables their services without hardening SSH yet.

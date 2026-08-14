@@ -1,5 +1,5 @@
 [Unit]
-Description=Local Xray client for x-ui tunnel health checks
+Description=Local Hysteria2 client for x-ui tunnel health checks
 Wants=network-online.target
 After=network-online.target
 

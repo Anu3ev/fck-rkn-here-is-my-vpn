@@ -4,7 +4,7 @@ set -euo pipefail
 readonly RUNTIME_CONFIG="/etc/default/vpn"
 # shellcheck disable=SC1090,SC1091 # Created and protected by deploy.sh.
 source "${RUNTIME_CONFIG}"
-readonly VPN_ADMIN_USER
+readonly VPN_ADMIN_USER VPN_TUNNEL_PORT
 readonly BACKUP_DIR="/var/backups/x-ui"
 readonly RETENTION_DAYS="${RETENTION_DAYS:-14}"
 staging_dir=""
@@ -23,6 +23,8 @@ validate_environment() {
   [[ -s "${RUNTIME_CONFIG}" ]]
   [[ -s /etc/x-ui/x-ui.db ]]
   [[ "${VPN_ADMIN_USER}" =~ ^[a-z_][a-z0-9_-]{0,30}$ ]]
+  [[ "${VPN_TUNNEL_PORT}" =~ ^[0-9]+$ ]]
+  [[ "${VPN_TUNNEL_PORT}" -ge 1 && "${VPN_TUNNEL_PORT}" -le 65535 ]]
   command -v sqlite3 >/dev/null
   command -v sha256sum >/dev/null
 }
@@ -105,6 +107,9 @@ write_manifest() {
     printf 'panel_version=%s\n' "$(/usr/local/x-ui/x-ui -v | tail -n 1)"
     printf 'xray_version=%s\n' \
       "$(/usr/local/x-ui/bin/xray-linux-amd64 version | head -n 1)"
+    printf 'tunnel_protocol=hysteria2\n'
+    printf 'tunnel_transport=udp\n'
+    printf 'tunnel_port=%s\n' "${VPN_TUNNEL_PORT}"
     printf 'x_ui_active=%s\n' "$(systemctl is-active x-ui)"
   } > "${manifest}"
 

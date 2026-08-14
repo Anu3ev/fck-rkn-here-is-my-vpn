@@ -51,13 +51,13 @@ sudo /usr/local/sbin/x-ui-render-health-client
 sudo systemctl restart x-ui-health x-ui
 ```
 
-Change at least `VPN_SERVER_ADDRESS` and `VPN_EXPECTED_EGRESS_IP`. Change the public ports only when the replacement deployment intentionally uses different ones.
+Change at least `VPN_SERVER_ADDRESS`, `VPN_EXPECTED_EGRESS_IP`, and `VPN_TLS_SERVER_NAME` when the domain changes. Change public ports only when the replacement deployment intentionally uses different ones.
 
 ## 4. Update public endpoints
 
 1. Point the VPN domain to the new IP, if a domain is used.
 2. Reissue or reinstall the HTTPS certificate.
-3. Update the panel and subscription public address in 3x-ui.
+3. Update the panel, subscription, and Hysteria2 public address and certificate paths in 3x-ui.
 4. Verify the random panel and subscription paths were preserved.
 5. Refresh each user's subscription in their client.
 
@@ -69,4 +69,4 @@ sudo systemctl --failed
 sudo systemctl list-timers 'x-ui-*'
 ```
 
-Test one real user on Wi-Fi and mobile data. Confirm the external IP, DNS, panel traffic counters, backup timer, and certificate. Remove the uploaded restore archive from the administrative home only after an off-server encrypted copy is safe.
+Test one real user in OneXray on Wi-Fi and mobile data. Confirm Global routing, external IP, DNS, panel traffic counters, UDP listener, backup timer, and certificate. Remove the uploaded restore archive from the administrative home only after an off-server encrypted copy is safe.

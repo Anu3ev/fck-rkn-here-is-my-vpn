@@ -56,4 +56,4 @@ sudo /usr/local/sbin/x-ui-diagnose
 
 Before replacing live files, the restore script creates a rescue backup. It restores only the VPN-owned state and the host configuration explicitly listed in the script.
 
-After restoring onto a different IP or domain, update `/etc/default/vpn`, reissue the certificate, update public addresses in 3x-ui, rerender the health client, and refresh user subscriptions.
+After restoring onto a different IP or domain, update `VPN_SERVER_ADDRESS`, `VPN_EXPECTED_EGRESS_IP`, and `VPN_TLS_SERVER_NAME` in `/etc/default/vpn`. Reissue the certificate, update the Hysteria2 and subscription addresses in 3x-ui, rerender the health client, and refresh user subscriptions.

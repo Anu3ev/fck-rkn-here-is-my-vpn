@@ -1,8 +1,8 @@
 # Install from Ubuntu
 
-This guide assumes a new Ubuntu 24.04 x86-64 VPS and an Ubuntu computer with `ssh`, `scp`, and `git`.
+This guide assumes a new Ubuntu 24.04 x86-64 VPS and an Ubuntu computer with `ssh`, `scp`, and `git`. Complete the [preflight checklist](preflight.md) first.
 
-Replace every value inside `<ANGLE_BRACKETS>` before running a command.
+Replace every value inside `<ANGLE_BRACKETS>` before running a command. Local commands run on your computer; VPS commands run inside SSH.
 
 ## 1. Generate the administrative SSH key
 
@@ -27,7 +27,7 @@ In that root session, install Git and clone this repository:
 ```bash
 apt-get update
 apt-get install -y git
-git clone <REPOSITORY_URL> /opt/vpn
+git clone https://github.com/Anu3ev/fck-rkn-here-is-my-vpn.git /opt/vpn
 ```
 
 In a second local terminal, upload only the new public key:
@@ -40,22 +40,23 @@ scp -i <PROVIDER_PRIVATE_KEY_PATH> \
 
 ## 3. Prepare Ubuntu
 
-Return to the root SSH session and set the deployment values. Use a random high panel port, for example a number between 20000 and 60000.
+Return to the root SSH session and set the deployment values. Prefer the VPN domain as `VPN_SERVER_ADDRESS`; it keeps user links valid if the VPS IP later changes.
 
 ```bash
 cd /opt/vpn
-export VPN_SERVER_ADDRESS='<SERVER_IP_OR_DOMAIN>'
+export VPN_SERVER_ADDRESS='<VPN_DOMAIN>'
 export VPN_EXPECTED_EGRESS_IP='<SERVER_PUBLIC_IP>'
 export VPN_PANEL_PORT='<RANDOM_HIGH_PORT>'
 export VPN_SUBSCRIPTION_PORT='2096'
-export VPN_XRAY_PORT='443'
+export VPN_TUNNEL_PORT='443'
+export VPN_TLS_SERVER_NAME='<VPN_DOMAIN>'
 export VPN_CERTIFICATE_FILE=''
 export PANEL_ALLOWED_CIDR='<OPTIONAL_ADMIN_PUBLIC_IP/32>'
 export ADMIN_PUBLIC_KEY_FILE='/root/vpnadmin.pub'
 bash ./deploy.sh prepare
 ```
 
-Leave `PANEL_ALLOWED_CIDR` empty if your administrative IP changes frequently. The script will securely prompt twice for the new `vpnadmin` sudo password.
+Leave `PANEL_ALLOWED_CIDR` empty if your administrative IP changes frequently. The script prompts twice for a new `vpnadmin` sudo password. Save it in a password manager.
 
 ## 4. Verify the new SSH account
 
@@ -85,4 +86,4 @@ cd /opt/vpn
 bash ./deploy.sh install
 ```
 
-Continue with [Configure 3x-ui and VLESS REALITY](configure-3x-ui.md). Do not run `enable-operations` until the technical health client file described there exists.
+Continue with [Configure 3x-ui and Hysteria2](configure-3x-ui.md). Do not run `enable-operations` until the technical health-client file described there exists.

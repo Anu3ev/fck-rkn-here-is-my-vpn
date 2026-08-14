@@ -15,51 +15,59 @@ validate_inputs() {
   command -v jq >/dev/null
 }
 
-# Writes an Xray client that reaches the public REALITY inbound through SOCKS.
+# Writes an Xray client that reaches the public Hysteria2 inbound through SOCKS.
 render_config() {
   # shellcheck disable=SC1090 # Both root-owned paths may be overridden for validation.
   source "${RUNTIME_CONFIG}"
   # shellcheck disable=SC1090
   source "${CLIENTS_FILE}"
-  [[ -n "${VPN_HEALTH_CLIENT_UUID:-}" ]]
+  [[ -n "${VPN_HEALTH_CLIENT_AUTH:-}" ]]
   [[ -n "${VPN_SERVER_ADDRESS:-}" ]]
-  [[ "${VPN_XRAY_PORT:-}" =~ ^[0-9]+$ ]]
-  [[ -n "${REALITY_PUBLIC_KEY:-}" ]]
-  [[ -n "${REALITY_SHORT_ID:-}" ]]
-  [[ -n "${REALITY_SERVER_NAME:-}" ]]
+  [[ "${VPN_TUNNEL_PORT:-}" =~ ^[0-9]+$ ]]
+  [[ "${VPN_TUNNEL_PORT}" -ge 1 && "${VPN_TUNNEL_PORT}" -le 65535 ]]
+  [[ -n "${VPN_TLS_SERVER_NAME:-}" ]]
+  [[ -n "${HYSTERIA_SALAMANDER_PASSWORD:-}" ]]
+  [[ "${#HYSTERIA_SALAMANDER_PASSWORD}" -ge 16 ]]
 
   umask 077
   jq -n \
-    --arg uuid "${VPN_HEALTH_CLIENT_UUID}" \
+    --arg auth "${VPN_HEALTH_CLIENT_AUTH}" \
     --arg server_address "${VPN_SERVER_ADDRESS}" \
-    --argjson server_port "${VPN_XRAY_PORT}" \
-    --arg password "${REALITY_PUBLIC_KEY}" \
-    --arg short_id "${REALITY_SHORT_ID}" \
-    --arg server_name "${REALITY_SERVER_NAME}" \
+    --argjson server_port "${VPN_TUNNEL_PORT}" \
+    --arg server_name "${VPN_TLS_SERVER_NAME}" \
+    --arg salamander_password "${HYSTERIA_SALAMANDER_PASSWORD}" \
     '{
       log: {loglevel: "warning"},
       inbounds: [{
         listen: "127.0.0.1",
         port: 10809,
         protocol: "socks",
-        settings: {auth: "noauth", udp: false}
+        settings: {auth: "noauth", udp: true}
       }],
       outbounds: [{
-        protocol: "vless",
-        settings: {vnext: [{
+        protocol: "hysteria",
+        settings: {
+          version: 2,
           address: $server_address,
-          port: $server_port,
-          users: [{id: $uuid, encryption: "none", flow: "xtls-rprx-vision"}]
-        }]},
+          port: $server_port
+        },
         streamSettings: {
-          network: "tcp",
-          security: "reality",
-          realitySettings: {
+          network: "hysteria",
+          security: "tls",
+          tlsSettings: {
             serverName: $server_name,
-            fingerprint: "chrome",
-            password: $password,
-            shortId: $short_id,
-            spiderX: "/"
+            alpn: ["h3"],
+            allowInsecure: false
+          },
+          hysteriaSettings: {
+            version: 2,
+            auth: $auth
+          },
+          finalmask: {
+            udp: [{
+              type: "salamander",
+              settings: {password: $salamander_password}
+            }]
           }
         }
       }]

@@ -14,7 +14,7 @@ rescue_archive=""
 restored_admin_user=""
 restored_panel_port=""
 restored_subscription_port=""
-restored_xray_port=""
+restored_tunnel_port=""
 
 # Removes only the temporary extraction directory created by this run.
 cleanup() {
@@ -64,13 +64,16 @@ load_restored_configuration() {
   restored_admin_user="$(read_config_value "${config}" VPN_ADMIN_USER)"
   restored_panel_port="$(read_config_value "${config}" VPN_PANEL_PORT)"
   restored_subscription_port="$(read_config_value "${config}" VPN_SUBSCRIPTION_PORT)"
-  restored_xray_port="$(read_config_value "${config}" VPN_XRAY_PORT)"
+  restored_tunnel_port="$(read_config_value "${config}" VPN_TUNNEL_PORT)"
 
   [[ "${restored_admin_user}" =~ ^[a-z_][a-z0-9_-]{0,30}$ ]]
   id "${restored_admin_user}" >/dev/null
   [[ "${restored_panel_port}" =~ ^[0-9]+$ ]]
   [[ "${restored_subscription_port}" =~ ^[0-9]+$ ]]
-  [[ "${restored_xray_port}" =~ ^[0-9]+$ ]]
+  [[ "${restored_tunnel_port}" =~ ^[0-9]+$ ]]
+  [[ "${restored_panel_port}" -ge 1 && "${restored_panel_port}" -le 65535 ]]
+  [[ "${restored_subscription_port}" -ge 1 && "${restored_subscription_port}" -le 65535 ]]
+  [[ "${restored_tunnel_port}" -ge 1 && "${restored_tunnel_port}" -le 65535 ]]
 }
 
 # Creates a complete rollback archive before replacing live configuration.
@@ -149,7 +152,7 @@ start_and_verify() {
   systemctl start x-ui
   for ((attempt = 1; attempt <= 60; attempt++)); do
     if systemctl is-active --quiet x-ui \
-      && ss -H -lnt sport = :"${restored_xray_port}" | grep -q . \
+      && ss -H -lnu sport = :"${restored_tunnel_port}" | grep -q . \
       && ss -H -lnt sport = :"${restored_subscription_port}" | grep -q . \
       && ss -H -lnt sport = :"${restored_panel_port}" | grep -q .; then
       break
@@ -159,8 +162,9 @@ start_and_verify() {
 
   [[ "$(systemctl is-active x-ui)" == "active" ]]
   [[ "$(systemctl is-active x-ui-health)" == "active" ]]
-  ss -H -lnt sport = :"${restored_xray_port}" | grep -q .
+  ss -H -lnu sport = :"${restored_tunnel_port}" | grep -q .
   ss -H -lnt sport = :"${restored_subscription_port}" | grep -q .
+  ss -H -lnt sport = :"${restored_panel_port}" | grep -q .
 }
 
 trap cleanup EXIT

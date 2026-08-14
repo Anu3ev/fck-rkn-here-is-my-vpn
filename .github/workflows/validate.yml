@@ -1,0 +1,47 @@
+name: Validate repository
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq ripgrep shellcheck
+
+      - name: Validate repository contract
+        run: bash tests/repository-validation.sh
+
+      - name: Run ShellCheck
+        run: shellcheck deploy.sh ops/diagnose.sh scripts/*.sh tests/*.sh
+
+      - name: Test Hysteria2 health-client renderer
+        run: sudo bash tests/render-health-client.sh
+
+      - name: Parse the PowerShell helper
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "$PWD/scripts/show-access.ps1",
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+
+          if ($errors.Count -gt 0) {
+            $errors | Format-List
+            exit 1
+          }
