@@ -15,6 +15,7 @@ sudo x-ui
 Set and save all of the following:
 
 - a unique administrator username and a long random password;
+- TOTP two-factor authentication paired with your authenticator app;
 - the panel port stored as `VPN_PANEL_PORT` in `/etc/default/vpn`;
 - a random panel web base path;
 - the subscription port stored as `VPN_SUBSCRIPTION_PORT`;
@@ -33,23 +34,35 @@ Then use the local tunneled address in the browser. Do not send credentials to a
 
 ## 2. Issue and record the TLS certificate
 
-Confirm that the VPN domain resolves to the VPS, then use the `x-ui` management menu's certificate function to issue a Let's Encrypt certificate. Configure its full-chain and private-key paths for the panel, subscription service, and Hysteria2 inbound.
+Use the `x-ui` management menu's SSL certificate function to request a Let's Encrypt certificate. A domain certificate is recommended and normally lasts about 90 days. If you do not have a domain, choose the public-IP certificate option; that certificate is trusted but lasts only about six days.
 
-TCP port `80` remains open for standalone ACME renewal. When `/root/.acme.sh/acme.sh` exists, `enable-operations` enables the renewal timer.
-
-Record the full-chain path for diagnostics:
+Configure the resulting full-chain and private-key paths for the panel, subscription service, and Hysteria2 inbound. Then record the certificate mode and both paths for diagnostics and automatic recovery:
 
 ```bash
 sudoedit /etc/default/vpn
 ```
 
-Set the existing line to the real path:
+For a domain certificate, update the existing values with the exact paths shown by `x-ui`:
 
 ```text
-VPN_CERTIFICATE_FILE=/root/cert/<VPN_DOMAIN>/fullchain.cer
+VPN_CERTIFICATE_MODE=domain
+VPN_TLS_SERVER_NAME=<VPN_DOMAIN>
+VPN_CERTIFICATE_FILE=<FULL_CHAIN_PATH_SHOWN_BY_X_UI>
+VPN_CERTIFICATE_KEY_FILE=<PRIVATE_KEY_PATH_SHOWN_BY_X_UI>
 ```
 
-The exact path shown by `x-ui` is authoritative. Verify panel and subscription HTTPS from another computer before sharing any link.
+For a public IPv4 certificate, use the fixed paths installed by current 3x-ui releases:
+
+```text
+VPN_CERTIFICATE_MODE=ip
+VPN_TLS_SERVER_NAME=<SERVER_PUBLIC_IP>
+VPN_CERTIFICATE_FILE=/root/cert/ip/fullchain.pem
+VPN_CERTIFICATE_KEY_FILE=/root/cert/ip/privkey.pem
+```
+
+TCP port `80` remains open for standalone ACME validation; nothing listens there between renewal attempts. `enable-operations` verifies the registration, certificate lifetime, and key pair before enabling a six-hour renewal timer. If the ACME registration disappears or the installed certificate has less than 48 hours left, the renewal script requests and installs a replacement instead of reporting a false success.
+
+The exact paths shown by `x-ui` are authoritative for a domain deployment. Verify panel and subscription HTTPS from another computer before sharing any link. Never bypass a browser certificate warning to enter panel credentials.
 
 ## 3. Create one Hysteria2 inbound
 
@@ -66,7 +79,7 @@ In 3x-ui, add one inbound with these properties:
 - listen address: blank or all interfaces;
 - port: `VPN_TUNNEL_PORT`, normally UDP `443`;
 - TLS enabled with the certificate and key from the previous step;
-- TLS server name: the `VPN_TLS_SERVER_NAME` domain;
+- TLS server name: the `VPN_TLS_SERVER_NAME` domain or public IP;
 - ALPN: `h3`;
 - Hysteria version: `2`;
 - FinalMask UDP type: `salamander`;

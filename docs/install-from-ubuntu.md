@@ -44,19 +44,24 @@ Return to the root SSH session and set the deployment values. Prefer the VPN dom
 
 ```bash
 cd /opt/vpn
-export VPN_SERVER_ADDRESS='<VPN_DOMAIN>'
+export VPN_SERVER_ADDRESS='<VPN_DOMAIN_OR_SERVER_IP>'
 export VPN_EXPECTED_EGRESS_IP='<SERVER_PUBLIC_IP>'
 export VPN_PANEL_PORT='<RANDOM_HIGH_PORT>'
 export VPN_SUBSCRIPTION_PORT='2096'
 export VPN_TUNNEL_PORT='443'
-export VPN_TLS_SERVER_NAME='<VPN_DOMAIN>'
+export VPN_TLS_SERVER_NAME='<VPN_DOMAIN_OR_SERVER_IP>'
+export VPN_CERTIFICATE_MODE='<domain_OR_ip>'
 export VPN_CERTIFICATE_FILE=''
+export VPN_CERTIFICATE_KEY_FILE=''
+export VPN_ACME_HTTP_PORT='80'
 export PANEL_ALLOWED_CIDR='<OPTIONAL_ADMIN_PUBLIC_IP/32>'
 export ADMIN_PUBLIC_KEY_FILE='/root/vpnadmin.pub'
 bash ./deploy.sh prepare
 ```
 
 Leave `PANEL_ALLOWED_CIDR` empty if your administrative IP changes frequently. The script prompts twice for a new `vpnadmin` sudo password. Save it in a password manager.
+
+Use `VPN_CERTIFICATE_MODE='domain'` when `VPN_TLS_SERVER_NAME` is a hostname. Use `VPN_CERTIFICATE_MODE='ip'` when it is the bare public IPv4 address.
 
 ## 4. Verify the new SSH account
 

@@ -17,16 +17,18 @@ This file is a reusable checklist, not proof that a new deployment has passed. S
 
 - The panel uses HTTPS with a valid certificate.
 - The panel username, password, port, and web base path are not defaults.
+- TOTP two-factor authentication is enabled and a recovery procedure is recorded privately.
 - The subscription, JSON, and Clash paths are random and are not `/sub/`, `/json/`, or `/clash/`.
 - An old or deliberately invalid subscription URL returns HTTP 404.
 - Each person has a unique UUID and subscription ID.
 - Temporary installer or fallback API tokens have been removed.
+- LDAP and other unused authentication integrations are disabled.
 
 ## VPN path
 
 - One Hysteria2 inbound listens on the configured UDP tunnel port.
 - The VPS provider firewall and UFW both allow that UDP port.
-- TLS uses the configured domain, a valid certificate, and `h3` ALPN.
+- TLS uses the configured domain or public IP, a valid certificate, and `h3` ALPN.
 - FinalMask uses UDP Salamander with the same strong password on server and clients.
 - Every person has a unique authentication value and subscription ID.
 - The technical health client is separate from all human users.
@@ -41,6 +43,9 @@ This file is a reusable checklist, not proof that a new deployment has passed. S
 - The latest backup has also been copied to encrypted storage outside the VPS.
 - 3x-ui, Xray, the health client, Fail2Ban, and timers start after a controlled reboot.
 - Certificate expiry is comfortably longer than the renewal interval.
+- `acme.sh --list` contains the configured TLS identity and a future renewal time.
+- The certificate renewal service verifies the registration, matching private key, and at least 48 hours of remaining validity.
+- The public panel completes a trusted TLS handshake and serves the same certificate stored on disk.
 
 ## Commands
 
@@ -48,7 +53,8 @@ This file is a reusable checklist, not proof that a new deployment has passed. S
 sudo /usr/local/sbin/x-ui-diagnose
 sudo systemctl --failed
 sudo systemctl list-timers 'x-ui-*'
-sudo sshd -T | grep -E 'permitrootlogin|passwordauthentication|kbdinteractiveauthentication|allowusers|maxauthtries|logingracetime'
+sudo sshd -T | grep -E 'permitrootlogin|passwordauthentication|kbdinteractiveauthentication|x11forwarding|allowusers|maxauthtries|logingracetime'
+sudo /root/.acme.sh/acme.sh --list
 sudo /usr/local/sbin/x-ui-backup
 ```
 

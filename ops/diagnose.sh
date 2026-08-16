@@ -4,8 +4,9 @@ set -euo pipefail
 readonly RUNTIME_CONFIG="/etc/default/vpn"
 # shellcheck disable=SC1090,SC1091 # Created and protected by deploy.sh.
 source "${RUNTIME_CONFIG}"
-readonly VPN_EXPECTED_EGRESS_IP VPN_PANEL_PORT VPN_SUBSCRIPTION_PORT VPN_TUNNEL_PORT
-readonly VPN_CERTIFICATE_FILE
+readonly VPN_SERVER_ADDRESS VPN_EXPECTED_EGRESS_IP VPN_PANEL_PORT
+readonly VPN_SUBSCRIPTION_PORT VPN_TUNNEL_PORT VPN_TLS_SERVER_NAME
+readonly VPN_CERTIFICATE_MODE VPN_CERTIFICATE_FILE VPN_CERTIFICATE_KEY_FILE
 
 # Prints a check name and fails the diagnostic run when its command fails.
 check() {
@@ -51,12 +52,90 @@ check_listener() {
   ss -H -lnt "sport = :${port}" | grep -q .
 }
 
+# Confirms that acme.sh retains the renewal configuration for this identity.
+check_certificate_registration() {
+  local acme_bin='/root/.acme.sh/acme.sh'
+  [[ -x "${acme_bin}" ]]
+  [[ -n "${VPN_TLS_SERVER_NAME}" ]]
+
+  "${acme_bin}" --list \
+    | awk -v name="${VPN_TLS_SERVER_NAME}" '$1 == name {print $1}' \
+    | grep -Fxq "${VPN_TLS_SERVER_NAME}"
+}
+
+# Confirms that the installed certificate and private key are one pair.
+check_certificate_key_pair() {
+  local certificate_digest=""
+  local private_key_digest=""
+  [[ -f "${VPN_CERTIFICATE_FILE}" ]] || return 1
+  [[ -f "${VPN_CERTIFICATE_KEY_FILE}" ]] || return 1
+
+  certificate_digest="$(openssl x509 -in "${VPN_CERTIFICATE_FILE}" \
+    -pubkey -noout | openssl pkey -pubin -outform DER | sha256sum | awk '{print $1}')"
+  private_key_digest="$(openssl pkey -in "${VPN_CERTIFICATE_KEY_FILE}" \
+    -pubout -outform DER | sha256sum | awk '{print $1}')"
+
+  [[ -n "${certificate_digest}" ]]
+  [[ "${certificate_digest}" == "${private_key_digest}" ]]
+}
+
+# Confirms that the certificate covers the configured domain or public IP.
+check_certificate_identity() {
+  [[ -f "${VPN_CERTIFICATE_FILE}" ]] || return 1
+  [[ "${VPN_CERTIFICATE_MODE}" == "domain" \
+    || "${VPN_CERTIFICATE_MODE}" == "ip" ]] || return 1
+
+  if [[ "${VPN_CERTIFICATE_MODE}" == "ip" ]]; then
+    openssl x509 -in "${VPN_CERTIFICATE_FILE}" -noout \
+      -checkip "${VPN_TLS_SERVER_NAME}" >/dev/null
+    return
+  fi
+
+  openssl x509 -in "${VPN_CERTIFICATE_FILE}" -noout \
+    -checkhost "${VPN_TLS_SERVER_NAME}" >/dev/null
+}
+
+# Confirms that 3x-ui serves the same certificate that renewal maintains on disk.
+check_served_certificate() {
+  local installed_fingerprint=""
+  local served_fingerprint=""
+  [[ "${VPN_PANEL_PORT}" =~ ^[0-9]+$ ]]
+  [[ -f "${VPN_CERTIFICATE_FILE}" ]] || return 1
+
+  installed_fingerprint="$(openssl x509 -in "${VPN_CERTIFICATE_FILE}" \
+    -noout -fingerprint -sha256)"
+  served_fingerprint="$(timeout 15 openssl s_client \
+    -connect "127.0.0.1:${VPN_PANEL_PORT}" \
+    -servername "${VPN_TLS_SERVER_NAME}" -showcerts </dev/null 2>/dev/null \
+    | openssl x509 -noout -fingerprint -sha256)"
+
+  [[ -n "${served_fingerprint}" ]]
+  [[ "${served_fingerprint}" == "${installed_fingerprint}" ]]
+}
+
+# Performs a trusted TLS handshake against the public panel address.
+check_public_panel_tls() {
+  local panel_url="https://${VPN_TLS_SERVER_NAME}:${VPN_PANEL_PORT}/"
+  local -a curl_arguments=(--silent --show-error --max-time 20 --output /dev/null)
+  [[ -n "${VPN_SERVER_ADDRESS}" ]]
+  [[ -n "${VPN_TLS_SERVER_NAME}" ]]
+
+  if [[ "${VPN_SERVER_ADDRESS}" != "${VPN_TLS_SERVER_NAME}" ]]; then
+    curl_arguments+=(--resolve \
+      "${VPN_TLS_SERVER_NAME}:${VPN_PANEL_PORT}:${VPN_SERVER_ADDRESS}")
+  fi
+
+  curl "${curl_arguments[@]}" "${panel_url}"
+}
+
 [[ "${EUID}" -eq 0 ]]
 [[ -s "${RUNTIME_CONFIG}" ]]
 [[ "${VPN_TUNNEL_PORT}" =~ ^[0-9]+$ ]]
 [[ "${VPN_SUBSCRIPTION_PORT}" =~ ^[0-9]+$ ]]
 [[ "${VPN_PANEL_PORT}" =~ ^[0-9]+$ ]]
 [[ "${VPN_EXPECTED_EGRESS_IP}" =~ ^[0-9A-Fa-f:.]+$ ]]
+[[ "${VPN_TLS_SERVER_NAME}" =~ ^[A-Za-z0-9.-]+$ ]]
+[[ "${VPN_CERTIFICATE_MODE}" == "domain" || "${VPN_CERTIFICATE_MODE}" == "ip" ]]
 
 printf '== System ==\n'
 printf 'Uptime: %s\n' "$(uptime -p)"
@@ -81,12 +160,19 @@ check "subscription TCP port ${VPN_SUBSCRIPTION_PORT}" \
 check "panel TCP port ${VPN_PANEL_PORT}" check_listener tcp "${VPN_PANEL_PORT}"
 check 'backup timer' systemctl is-active --quiet x-ui-backup.timer
 
-if [[ -n "${VPN_CERTIFICATE_FILE}" ]]; then
+if [[ -n "${VPN_CERTIFICATE_FILE}" && -n "${VPN_CERTIFICATE_KEY_FILE}" ]]; then
   check 'panel certificate file' test -f "${VPN_CERTIFICATE_FILE}"
-  check 'panel certificate for 24 hours' openssl x509 -checkend 86400 \
+  check 'panel certificate key file' test -f "${VPN_CERTIFICATE_KEY_FILE}"
+  check 'panel certificate for 48 hours' openssl x509 -checkend 172800 \
     -noout -in "${VPN_CERTIFICATE_FILE}"
+  check 'panel certificate identity' check_certificate_identity
+  check 'panel certificate and private key match' check_certificate_key_pair
+  check 'certificate registered for renewal' check_certificate_registration
+  check 'panel serves the installed certificate' check_served_certificate
+  check 'public panel TLS trust' check_public_panel_tls
+  check 'certificate renewal timer' systemctl is-active --quiet x-ui-cert-renew.timer
 else
-  printf 'SKIP panel certificate: VPN_CERTIFICATE_FILE is not configured\n'
+  printf 'SKIP panel certificate: certificate paths are not configured\n'
 fi
 
 printf '\nOpen TCP/UDP ports:\n'

@@ -17,7 +17,10 @@ readonly VPN_PANEL_PORT="${VPN_PANEL_PORT:-}"
 readonly VPN_SUBSCRIPTION_PORT="${VPN_SUBSCRIPTION_PORT:-2096}"
 readonly VPN_TUNNEL_PORT="${VPN_TUNNEL_PORT:-443}"
 readonly VPN_TLS_SERVER_NAME="${VPN_TLS_SERVER_NAME:-}"
+readonly VPN_CERTIFICATE_MODE="${VPN_CERTIFICATE_MODE:-domain}"
 readonly VPN_CERTIFICATE_FILE="${VPN_CERTIFICATE_FILE:-}"
+readonly VPN_CERTIFICATE_KEY_FILE="${VPN_CERTIFICATE_KEY_FILE:-}"
+readonly VPN_ACME_HTTP_PORT="${VPN_ACME_HTTP_PORT:-80}"
 readonly PANEL_ALLOWED_CIDR="${PANEL_ALLOWED_CIDR:-}"
 readonly ADMIN_PUBLIC_KEY_FILE="${ADMIN_PUBLIC_KEY_FILE:-}"
 readonly KEY_LOGIN_VERIFIED="${KEY_LOGIN_VERIFIED:-}"
@@ -52,7 +55,9 @@ validate_host() {
   [[ "${ID}" == "ubuntu" ]]
   [[ "${VERSION_ID}" == "24.04" ]]
   [[ -s "${REPO_ROOT}/scripts/backup.sh" ]]
+  [[ -s "${REPO_ROOT}/scripts/renew-certificate.sh" ]]
   [[ -s "${REPO_ROOT}/ops/diagnose.sh" ]]
+  [[ -s "${REPO_ROOT}/ops/systemd/x-ui-hardening.conf" ]]
 }
 
 # Validates one public TCP or UDP port used by the deployment.
@@ -71,11 +76,16 @@ validate_configuration() {
   [[ "${VPN_SERVER_ADDRESS}" =~ ^[A-Za-z0-9._:-]+$ ]]
   [[ "${VPN_EXPECTED_EGRESS_IP}" =~ ^[0-9A-Fa-f:.]+$ ]]
   [[ "${VPN_TLS_SERVER_NAME}" =~ ^[A-Za-z0-9.-]+$ ]]
+  [[ "${VPN_CERTIFICATE_MODE}" == "domain" || "${VPN_CERTIFICATE_MODE}" == "ip" ]]
   [[ -z "${VPN_CERTIFICATE_FILE}" || "${VPN_CERTIFICATE_FILE}" =~ ^/[A-Za-z0-9._/-]+$ ]]
+  [[ -z "${VPN_CERTIFICATE_KEY_FILE}" \
+    || "${VPN_CERTIFICATE_KEY_FILE}" =~ ^/[A-Za-z0-9._/-]+$ ]]
   [[ -z "${PANEL_ALLOWED_CIDR}" || "${PANEL_ALLOWED_CIDR}" =~ ^[0-9A-Fa-f:./]+$ ]]
   validate_port "panel" "${VPN_PANEL_PORT}"
   validate_port "subscription" "${VPN_SUBSCRIPTION_PORT}"
   validate_port "tunnel" "${VPN_TUNNEL_PORT}"
+  validate_port "ACME HTTP" "${VPN_ACME_HTTP_PORT}"
+  [[ "${VPN_ACME_HTTP_PORT}" -eq 80 ]]
   [[ "${VPN_PANEL_PORT}" -ge 1024 ]]
   [[ "${VPN_SUBSCRIPTION_PORT}" -ge 1024 ]]
   [[ "${VPN_PANEL_PORT}" != "${VPN_SUBSCRIPTION_PORT}" ]]
@@ -152,7 +162,10 @@ write_runtime_configuration() {
     printf 'VPN_SUBSCRIPTION_PORT=%q\n' "${VPN_SUBSCRIPTION_PORT}"
     printf 'VPN_TUNNEL_PORT=%q\n' "${VPN_TUNNEL_PORT}"
     printf 'VPN_TLS_SERVER_NAME=%q\n' "${VPN_TLS_SERVER_NAME}"
+    printf 'VPN_CERTIFICATE_MODE=%q\n' "${VPN_CERTIFICATE_MODE}"
     printf 'VPN_CERTIFICATE_FILE=%q\n' "${VPN_CERTIFICATE_FILE}"
+    printf 'VPN_CERTIFICATE_KEY_FILE=%q\n' "${VPN_CERTIFICATE_KEY_FILE}"
+    printf 'VPN_ACME_HTTP_PORT=%q\n' "${VPN_ACME_HTTP_PORT}"
     printf 'PANEL_ALLOWED_CIDR=%q\n' "${PANEL_ALLOWED_CIDR}"
   } > "${temporary_path}"
   install -o root -g root -m 644 "${temporary_path}" "${RUNTIME_CONFIG}"
@@ -167,7 +180,7 @@ configure_firewall() {
   ufw default deny incoming
   ufw default allow outgoing
   ufw limit 22/tcp
-  ufw allow 80/tcp
+  ufw allow "${VPN_ACME_HTTP_PORT}/tcp"
   ufw allow "${VPN_TUNNEL_PORT}/udp"
   ufw allow "${VPN_SUBSCRIPTION_PORT}/tcp"
 
@@ -220,10 +233,14 @@ install_operations() {
     /usr/local/sbin/x-ui-backup
   install -o root -g root -m 0750 "${REPO_ROOT}/scripts/restore.sh" \
     /usr/local/sbin/x-ui-restore
+  install -o root -g root -m 0750 "${REPO_ROOT}/scripts/renew-certificate.sh" \
+    /usr/local/sbin/x-ui-renew-certificate
   install -o root -g root -m 0750 "${REPO_ROOT}/ops/diagnose.sh" \
     /usr/local/sbin/x-ui-diagnose
   install -d -o root -g root -m 755 /etc/systemd/system/x-ui.service.d \
     /etc/systemd/journald.conf.d
+  install -o root -g root -m 644 "${REPO_ROOT}/ops/systemd/x-ui-hardening.conf" \
+    /etc/systemd/system/x-ui.service.d/hardening.conf
   install -o root -g root -m 644 "${REPO_ROOT}/ops/systemd/"x-ui-*.service \
     /etc/systemd/system/
   install -o root -g root -m 644 "${REPO_ROOT}/ops/systemd/"x-ui-*.timer \
@@ -239,6 +256,7 @@ install_operations() {
   systemctl restart fail2ban
 
   [[ -x /usr/local/sbin/x-ui-restore ]]
+  [[ -x /usr/local/sbin/x-ui-renew-certificate ]]
   [[ -f /etc/systemd/system/x-ui-backup.timer ]]
 }
 
@@ -246,6 +264,8 @@ install_operations() {
 enable_operations() {
   [[ -s /etc/x-ui/health-client.env ]]
   [[ -x /usr/local/sbin/x-ui-render-health-client ]]
+  [[ -n "${VPN_CERTIFICATE_FILE}" ]]
+  [[ -n "${VPN_CERTIFICATE_KEY_FILE}" ]]
   /usr/local/sbin/x-ui-render-health-client
   /usr/local/x-ui/bin/xray-linux-amd64 run -test \
     -config /etc/x-ui/tunnel-health-client.json
@@ -254,9 +274,8 @@ enable_operations() {
   systemctl daemon-reload
   systemctl enable --now x-ui-health.service x-ui-backup.timer
 
-  if [[ -x /root/.acme.sh/acme.sh ]]; then
-    systemctl enable --now x-ui-cert-renew.timer
-  fi
+  /usr/local/sbin/x-ui-renew-certificate
+  systemctl enable --now x-ui-cert-renew.timer
 
   systemctl restart x-ui
   systemctl start x-ui-backup.service
@@ -278,6 +297,7 @@ harden_ssh() {
 
   sshd -T | grep -Fxq 'passwordauthentication no'
   sshd -T | grep -Fxq 'permitrootlogin no'
+  sshd -T | grep -Fxq 'x11forwarding no'
 }
 
 trap cleanup EXIT
@@ -301,7 +321,7 @@ case "${MODE}" in
     ;;
   enable-operations)
     enable_operations
-    printf 'Health checks, backups, and available certificate renewal are enabled.\n'
+    printf 'Health checks, backups, and verified certificate renewal are enabled.\n'
     ;;
   harden-ssh)
     harden_ssh

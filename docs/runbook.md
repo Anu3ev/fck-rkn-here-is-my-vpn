@@ -67,10 +67,30 @@ Log rotation keeps `/var/log/x-ui/*.log` for seven rotations. Never paste comple
 ```bash
 sudo systemctl status x-ui-cert-renew.timer --no-pager
 sudo journalctl -u x-ui-cert-renew.service --since '-7 days' --no-pager
-sudo /root/.acme.sh/acme.sh --cron --home /root/.acme.sh
+sudo /root/.acme.sh/acme.sh --list
+sudo /usr/local/sbin/x-ui-renew-certificate
+sudo /usr/local/sbin/x-ui-diagnose
 ```
 
-If the certificate changes location, update the panel and subscription certificate settings before restarting 3x-ui.
+The renewal command must print `Certificate renewal check passed`. A successful empty `acme.sh --cron` run is not sufficient: the identity must appear in `acme.sh --list`, the certificate and key must match, and the panel must serve that same certificate.
+
+Public-IP certificates last about six days and normally renew inside the CA-provided renewal window. The systemd timer checks every six hours. If renewal state disappears or less than 48 hours remain, the repository script reissues and reinstalls the certificate automatically.
+
+If the certificate changes location, update `VPN_CERTIFICATE_FILE` and `VPN_CERTIFICATE_KEY_FILE` in `/etc/default/vpn`, then update the panel, subscription, and Hysteria2 TLS settings before restarting 3x-ui.
+
+## Security review
+
+Review these controls after installation and after major upgrades:
+
+```bash
+sudo sshd -T | grep -E 'permitrootlogin|passwordauthentication|kbdinteractiveauthentication|x11forwarding|allowusers|maxauthtries|logingracetime'
+sudo ufw status verbose
+sudo fail2ban-client status
+sudo systemctl --failed
+sudo stat -c '%U:%G %a %n' /etc/x-ui/x-ui.db /etc/x-ui/health-client.env
+```
+
+In the panel, confirm that TOTP 2FA is enabled, LDAP is disabled unless deliberately used, the administrator username and password are unique, and no unused API tokens remain. Restrict the panel firewall rule with `PANEL_ALLOWED_CIDR` when the administrator has a stable public address.
 
 ## When clients cannot connect
 

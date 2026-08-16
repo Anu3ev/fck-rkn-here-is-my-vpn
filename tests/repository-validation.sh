@@ -8,9 +8,11 @@ readonly -a SHELL_FILES=(
   ops/diagnose.sh
   scripts/backup.sh
   scripts/render-tunnel-client.sh
+  scripts/renew-certificate.sh
   scripts/restore.sh
   scripts/show-access.sh
   tests/render-health-client.sh
+  tests/renew-certificate.sh
   tests/repository-validation.sh
 )
 
@@ -51,6 +53,11 @@ validate_tunnel_contract() {
   # shellcheck disable=SC2016 # The source must contain this literal variable reference.
   grep -Fq 'ufw allow "${VPN_TUNNEL_PORT}/udp"' "${REPO_ROOT}/deploy.sh"
   grep -Fq 'protocol: "hysteria"' "${REPO_ROOT}/scripts/render-tunnel-client.sh"
+  grep -Fq 'ExecStart=/usr/local/sbin/x-ui-renew-certificate' \
+    "${REPO_ROOT}/ops/systemd/x-ui-cert-renew.service"
+  grep -Fq 'X11Forwarding no' "${REPO_ROOT}/ops/ssh/00-vpn-hardening.conf"
+  grep -Fq 'NoNewPrivileges=true' \
+    "${REPO_ROOT}/ops/systemd/x-ui-hardening.conf"
 }
 
 # Runs the repository checks in a deterministic order.

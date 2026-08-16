@@ -30,6 +30,9 @@ jobs:
       - name: Test Hysteria2 health-client renderer
         run: sudo bash tests/render-health-client.sh
 
+      - name: Test certificate renewal recovery
+        run: sudo bash tests/renew-certificate.sh
+
       - name: Parse the PowerShell helper
         shell: pwsh
         run: |

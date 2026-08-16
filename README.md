@@ -8,11 +8,11 @@ It is designed for a few trusted people, not for a commercial VPN service or a m
 
 - A fresh Ubuntu 24.04 LTS x86-64 VPS.
 - A public IPv4 address.
-- A domain with an `A` record pointing to that address.
+- Preferably a domain with an `A` record pointing to that address.
 - A Windows 10/11 or Ubuntu computer for administration.
 - About 30-60 minutes for the first deployment.
 
-The domain is required for a valid TLS certificate. The VPS needs at least 1 GB RAM and 10 GB disk for a small deployment.
+A domain is recommended but not required. 3x-ui can request a trusted Let's Encrypt certificate for a bare public IPv4 address. IP certificates last about six days, so the repository verifies and repairs their automatic renewal every six hours. The VPS needs at least 1 GB RAM and 10 GB disk for a small deployment.
 
 ## What this installs
 
@@ -72,6 +72,7 @@ An existing server that still uses VLESS should follow the separate [Hysteria2 m
 - A public server IP is not a credential, but real deployment details do not belong in this template.
 - Use random panel credentials, web paths, Hysteria2 authentication values, masking password, and subscription IDs.
 - Restrict the panel to an administrative IP with `PANEL_ALLOWED_CIDR` when practical. Otherwise use HTTPS and consider an SSH tunnel.
+- Enable TOTP two-factor authentication in the panel; this requires pairing your own authenticator and cannot be automated safely.
 - Give every person a separate client record and link so one account can be revoked safely.
 - Keep an encrypted backup outside the VPS. An on-server backup does not protect against provider or disk loss.
 - No protocol or server IP is guaranteed to remain reachable from every filtered network.
@@ -80,7 +81,7 @@ An existing server that still uses VLESS should follow the separate [Hysteria2 m
 
 - `deploy.sh` — phased host and 3x-ui deployment.
 - `ops/` — systemd, SSH, logging, security, and diagnostic configuration.
-- `scripts/` — backup, restore, health-client rendering, and local access tools.
+- `scripts/` — backup, restore, certificate renewal, health-client rendering, and local access tools.
 - `docs/` — installation, operation, recovery, migration, and end-user guides.
 
 The scripts intentionally target one Ubuntu VPS and SQLite. Kubernetes, external databases, and permanent secondary nodes are outside this project's scope.

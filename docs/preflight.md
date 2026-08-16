@@ -6,13 +6,13 @@ Run this checklist before changing a VPS. Stop if the host is not a new, dedicat
 
 - A fresh Ubuntu 24.04 LTS x86-64 VPS with temporary root SSH access.
 - A public IPv4 address.
-- A domain you control, with an `A` record pointing to the VPS IPv4 address.
+- Preferably a domain you control, with an `A` record pointing to the VPS IPv4 address. A bare public IPv4 address also works with a short-lived certificate.
 - At least 1 GB RAM and 10 GB disk.
 - A local Windows or Ubuntu computer where the permanent Ed25519 private key will remain.
 - A random panel port between `20000` and `60000`.
 - An optional fixed administrative IP/CIDR that may reach the panel.
 
-Wait until this command returns the VPS address before requesting a certificate:
+For a domain deployment, wait until this command returns the VPS address before requesting a certificate:
 
 ```bash
 getent ahostsv4 <VPN_DOMAIN>
@@ -31,6 +31,8 @@ If the VPS provider has a firewall or security group, allow these inbound connec
 | 3x-ui panel | TCP | your random panel port |
 
 Restrict the panel rule to your administrative IP when practical. Hysteria2 uses UDP; opening only TCP `443` will not work.
+
+TCP `80` must stay reachable for standalone certificate renewal. Nothing listens there between renewal checks.
 
 ## Read-only VPS checks
 

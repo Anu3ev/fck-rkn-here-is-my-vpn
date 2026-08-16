@@ -65,6 +65,7 @@ copy_configuration() {
     /etc/apt/apt.conf.d/52vpn-unattended-upgrades
     /etc/systemd/journald.conf.d/vpn-limits.conf
     /etc/logrotate.d/x-ui
+    /etc/systemd/system/x-ui.service.d/hardening.conf
     /etc/systemd/system/x-ui.service.d/health.conf
     /etc/systemd/system/x-ui-health.service
     /etc/systemd/system/x-ui-backup.service
